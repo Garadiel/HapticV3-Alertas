@@ -66,6 +66,8 @@ class SoundEngine(context: Context) : SoundRecognizer {
     private val _log = MutableSharedFlow<String>(extraBufferCapacity = 64)
     override val events: Flow<SoundEvent> = _events
     override val log: Flow<String> = _log
+    private val _nivelMicrofono = MutableStateFlow<Float?>(null)
+    val nivelMicrofono = _nivelMicrofono.asStateFlow()
 
     override val contextosDisponibles: List<String> = config.nombres
 
@@ -83,34 +85,43 @@ class SoundEngine(context: Context) : SoundRecognizer {
     override fun start() {
         if (job?.isActive == true) return
         job = scope.launch {
-            val minBuf = AudioRecord.getMinBufferSize(
-                SR, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT
-            )
-            val bufBytes = maxOf(minBuf, HOP * 4 * 4)
-            val record = crearAudioRecord(bufBytes)
-            if (record.state != AudioRecord.STATE_INITIALIZED) {
-                _log.emit("ERROR: no se pudo abrir el microfono")
-                return@launch
-            }
-            _log.emit("Escuchando en contexto: $contexto")
-            record.startRecording()
-
-            val ventana = FloatArray(WINDOW)
-            val chunk = FloatArray(HOP)
-            var llenos = 0
+            var grabador: AudioRecord? = null
             try {
+                val minBuf = AudioRecord.getMinBufferSize(
+                    SR, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT
+                )
+                val record = crearAudioRecord(maxOf(minBuf, HOP * 4 * 4))
+                grabador = record
+                check(record.state == AudioRecord.STATE_INITIALIZED) { "No se pudo abrir el micrófono" }
+                record.startRecording()
+                check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "No se pudo iniciar la captura" }
+                _log.emit("Escuchando en contexto: $contexto")
+
+                val ventana = FloatArray(WINDOW)
+                val chunk = FloatArray(HOP)
+                var llenos = 0
                 while (isActive) {
                     val n = record.read(chunk, 0, HOP, AudioRecord.READ_BLOCKING)
                     if (n != HOP) { _log.emit("ERROR de lectura de audio: $n"); break }
+                    var energia = 0.0
+                    for (muestra in chunk) energia += (muestra * muestra).toDouble()
+                    _nivelMicrofono.value = (20 * log10(sqrt(energia / n).coerceAtLeast(1e-9))).toFloat()
                     System.arraycopy(ventana, HOP, ventana, 0, WINDOW - HOP)
                     System.arraycopy(chunk, 0, ventana, WINDOW - HOP, HOP)
                     if (llenos < 2) { llenos++; continue }
                     procesar(ventana)
                 }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _log.emit("ERROR: ${e.message ?: "Se interrumpió la escucha"}")
             } finally {
-                record.stop()
-                record.release()
-                _log.emit("Detenido")
+                _nivelMicrofono.value = null
+                grabador?.let {
+                    runCatching { it.stop() }
+                    it.release()
+                }
+                _log.tryEmit("Detenido")
             }
         }
     }

@@ -7,6 +7,8 @@ import com.tesis.audiotohaptics.config.HapticsConfig
 import com.tesis.audiotohaptics.config.HapticsException
 import android.net.Uri
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.*
 import org.junit.Test
 import org.tensorflow.lite.Interpreter
@@ -64,8 +66,10 @@ class YamnetIntegracionTest {
                 engine.setContext("hogar")
                 engine.start()
                 assertTrue(withTimeout(10000) { inicio.await() }.startsWith("Escuchando"))
-                delay(1800)
+                val nivel = withTimeout(10000) { engine.nivelMicrofono.filterNotNull().first() }
+                assertTrue(nivel.isFinite())
             } finally { engine.releaseAndJoin(); collector.cancelAndJoin() }
+            assertNull(engine.nivelMicrofono.value)
         }
     }
 

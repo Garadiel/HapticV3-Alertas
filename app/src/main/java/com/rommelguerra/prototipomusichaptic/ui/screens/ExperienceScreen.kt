@@ -63,9 +63,24 @@ fun ExperienceScreen(integracion: IntegracionViewModel = viewModel()) {
     var status by remember { mutableStateOf("Selecciona un audio para comenzar.") }
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     val vibrator = remember { context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator }
+    fun iniciarSiVisible() {
+        if (page == 2 && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) integracion.iniciarEscucha()
+    }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        iniciarSiVisible()
+    }
+    fun prepararEscucha() {
+        if (page != 2 || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            iniciarSiVisible()
+        }
+    }
     val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted && page == 2 && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) integracion.iniciarEscucha()
-        else if (!granted) integracion.permisoDenegado()
+        if (granted) prepararEscucha() else integracion.permisoDenegado()
     }
 
     val bluetoothPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permisos ->
@@ -193,7 +208,7 @@ fun ExperienceScreen(integracion: IntegracionViewModel = viewModel()) {
                             if (integracion.escuchando) integracion.detenerEscucha() else {
                                 if (ready) player?.pause()
                                 playing = false
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) integracion.iniciarEscucha()
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) prepararEscucha()
                                 else microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
                             }
                         }, onConectar = { page = 3

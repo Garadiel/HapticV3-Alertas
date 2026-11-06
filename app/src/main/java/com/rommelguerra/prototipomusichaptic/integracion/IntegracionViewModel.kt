@@ -24,6 +24,11 @@ class IntegracionViewModel(application: Application) : AndroidViewModel(applicat
     val bluetooth = ConexionEntornoBle(application)
     val catalogo = CatalogoCotidianoEquipo(application)
     private val salida: SalidaHaptica = SalidaHapticaTelefono(application)
+    private val avisosTelefono = AvisosSonidoAndroid(application)
+    var notificacionesActivas by mutableStateOf(avisosTelefono.habilitadas())
+        private set
+    var nivelMicrofono by mutableStateOf<Float?>(null)
+        private set
     private var escucha: Job? = null
     private val exclusividadEscucha = Mutex()
     private var versionEscucha = 0
@@ -116,6 +121,7 @@ class IntegracionViewModel(application: Application) : AndroidViewModel(applicat
         detenerAviso()
         ultimaDeteccion = null
         escuchando = true
+        notificacionesActivas = avisosTelefono.habilitadas()
         mensajeCotidiano = "Preparando reconocimiento…"
         val seleccionado = contexto
         val version = ++versionEscucha
@@ -136,6 +142,7 @@ class IntegracionViewModel(application: Application) : AndroidViewModel(applicat
                                     ultimaDeteccion = e
                                     val resumen = "${CatalogoCotidianoEquipo.etiqueta(e.clase)} · ${(e.confianza * 100).toInt()} % · prioridad ${e.prioridad} · ${e.contexto}"
                                     historial = (listOf(resumen) + historial).take(30)
+                                    notificacionesActivas = avisosTelefono.publicar(e)
                                     emitir(e.clase)
                                 }
                             }
@@ -146,8 +153,17 @@ class IntegracionViewModel(application: Application) : AndroidViewModel(applicat
                                     }
                                 }
                             }
+                            launch(start = CoroutineStart.UNDISPATCHED) {
+                                next.nivelMicrofono.collect { nivel ->
+                                    if (version != versionEscucha) return@collect
+                                    if (nivel != null && nivelMicrofono == null) {
+                                        mensajeCotidiano = "Escuchando en $seleccionado."
+                                    }
+                                    nivelMicrofono = nivel
+                                }
+                            }
+                            mensajeCotidiano = "Abriendo el micrófono…"
                             next.start()
-                            mensajeCotidiano = "Escuchando en ${seleccionado}. Se aplican las reglas originales del modelo."
                             awaitCancellation()
                         }
                     } finally {
@@ -156,11 +172,17 @@ class IntegracionViewModel(application: Application) : AndroidViewModel(applicat
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (version == versionEscucha) mensajeCotidiano = "No se pudo iniciar el motor: ${e.message}" }
-            finally { if (version == versionEscucha) escuchando = false }
+            finally {
+                if (version == versionEscucha) {
+                    escuchando = false
+                    nivelMicrofono = null
+                }
+            }
         }
     }
     fun detenerEscucha() {
         versionEscucha++; escucha?.cancel(); escucha = null
+        nivelMicrofono = null
         escuchando = false; detenerAviso(); mensajeCotidiano = "Escucha detenida."
     }
 

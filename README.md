@@ -29,6 +29,8 @@ Esta distribución es la del equipo: no se ha cambiado para hacerla coincidir co
 
 Para escuchar: abrir Cotidiano, elegir contexto, pulsar Iniciar escucha y conceder permiso al micrófono. Cambiar de contexto detiene la sesión; pulsar Iniciar escucha para usar el nuevo modo. Los botones Probar patrón son demostraciones manuales.
 
+El medidor muestra el nivel digital del audio capturado por el micrófono. Cada detección confirmada aparece en Cotidiano y genera una notificación de Android si está habilitada. En Android 13 o posterior, acepta el permiso de notificaciones al iniciar la escucha. La sesión se detiene al salir de Cotidiano o al pasar la app a segundo plano.
+
 El perfil del firmware es independiente del contexto de escucha. Elegir Social o Alerta bicicleta según el firmware instalado, conceder permisos y conectar la háptica. Se reutilizan los comandos existentes para ladrido, bebé, sirena y claxon. Maquinaria y vidrio roto se muestran en pantalla; no se inventan patrones ni comandos para esos sonidos. Si el perfil no acepta una alerta con patrón existente, se usa el teléfono. El estado Conectada comprueba el servicio GATT, no la ejecución física del motor.
 
 ## Música

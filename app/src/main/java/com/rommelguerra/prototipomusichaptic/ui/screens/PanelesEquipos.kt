@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.rommelguerra.prototipomusichaptic.integracion.*
 import com.tesis.audiotohaptics.config.Actuator
 import java.io.File
+import kotlin.math.roundToInt
 
 @Composable
 fun PanelCotidianoEquipo(vm: IntegracionViewModel, onEscuchar: () -> Unit, onConectar: () -> Unit, onProbar: (String) -> Unit) {
@@ -45,7 +46,11 @@ fun PanelCotidianoEquipo(vm: IntegracionViewModel, onEscuchar: () -> Unit, onCon
         Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f)) {
                 Text("Micrófono del entorno", fontWeight = FontWeight.Bold)
-                Text(if (vm.escuchando) "Activo · escuchando el entorno" else "Apagado · sin escucha", color = if (vm.escuchando) androidx.compose.ui.graphics.Color(0xFF14653C) else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(when {
+                    vm.nivelMicrofono != null -> "Activo · recibiendo audio"
+                    vm.escuchando -> "Esperando las primeras muestras…"
+                    else -> "Apagado · sin escucha"
+                })
             }
             Switch(
                 checked = vm.escuchando,
@@ -60,6 +65,18 @@ fun PanelCotidianoEquipo(vm: IntegracionViewModel, onEscuchar: () -> Unit, onCon
                 )
             )
         }
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+            val nivel = vm.nivelMicrofono
+            Text(when {
+                nivel == null -> "Nivel del micrófono · —"
+                nivel <= -70f -> "Nivel del micrófono · señal muy baja"
+                else -> "Nivel del micrófono · ${nivel.roundToInt()} dBFS"
+            }, style = MaterialTheme.typography.labelLarge)
+            LinearProgressIndicator(
+                progress = { ((nivel ?: -70f).coerceIn(-70f, 0f) + 70f) / 70f },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("nivel_microfono")
+            )
+        }
     }
     Text(vm.mensajeCotidiano)
     vm.ultimaDeteccion?.let { evento ->
@@ -69,7 +86,9 @@ fun PanelCotidianoEquipo(vm: IntegracionViewModel, onEscuchar: () -> Unit, onCon
             detalle = "${(evento.confianza * 100).toInt()} % de confianza · prioridad ${evento.prioridad} · ${evento.contexto}"
         )
     }
-    Text("El nivel de sonido del motor está sin calibrar para este teléfono.", fontSize = 13.sp)
+    if (vm.escuchando && !vm.notificacionesActivas) {
+        Text("Las notificaciones están desactivadas. Puedes activarlas en los ajustes de Android.", fontSize = 13.sp)
+    }
     ResumenHaptica(conectado, ocupado, onConectar)
     Text("Configuración de avisos", fontSize = 20.sp, fontWeight = FontWeight.Bold)
     Text("Elige el firmware instalado en tu háptica.", fontSize = 13.sp)
@@ -89,7 +108,7 @@ fun PanelCotidianoEquipo(vm: IntegracionViewModel, onEscuchar: () -> Unit, onCon
                 if (caso.entrenado) {
                     Text("Disponible · prioridad ${caso.prioridad} · confianza mínima ${(caso.umbral * 100).toInt()} %")
                     if (CatalogoCotidianoEquipo.sonido(caso.clase) == null) {
-                        Text("Detección en pantalla. El firmware recibido no incluye una señal para este sonido.", fontSize = 13.sp)
+                        Text("Aviso en el teléfono. El firmware recibido no incluye una señal para este sonido.", fontSize = 13.sp)
                     }
                     TextButton(onClick = { onProbar(caso.clase) }, modifier = Modifier.testTag("probar_${caso.clase}")) {
                         Text(if (CatalogoCotidianoEquipo.sonido(caso.clase) == null) "Probar aviso visual" else "Probar aviso y vibración")
