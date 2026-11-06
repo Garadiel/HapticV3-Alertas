@@ -14,17 +14,21 @@ class ExperienceSmokeTest {
 
     @Test fun demostracionesVisualesNoSeRegistranComoDetecciones() {
         compose.onNodeWithContentDescription("Cotidiano", useUnmergedTree = true).performClick()
-        compose.onNodeWithTag("probar_ladrido").performScrollTo().performClick()
+        compose.onNodeWithTag("nivel_microfono").assertIsDisplayed()
+        compose.onNodeWithTag("caso_ladrido").performScrollTo()
+        compose.onNodeWithTag("probar_ladrido").assertIsDisplayed().performClick()
         compose.onNodeWithTag("aviso_ladrido").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Demostración manual").assertIsDisplayed()
-        compose.onNodeWithTag("probar_vidrio_roto").performScrollTo().performClick()
+        compose.onNodeWithTag("caso_vidrio_roto").performScrollTo()
+        compose.onNodeWithTag("probar_vidrio_roto").assertIsDisplayed().performClick()
         compose.onNodeWithTag("aviso_vidrio_roto").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("aviso_ladrido").assertDoesNotExist()
         compose.onNodeWithText("Detecciones de esta sesión").assertDoesNotExist()
         compose.onNodeWithText("Última detección").assertDoesNotExist()
 
         compose.onNodeWithTag("contexto_urbano").performScrollTo().performClick()
-        compose.onNodeWithTag("probar_sirena").performScrollTo().performClick()
+        compose.onNodeWithTag("caso_sirena").performScrollTo()
+        compose.onNodeWithTag("probar_sirena").assertIsDisplayed().performClick()
         compose.onNodeWithTag("aviso_sirena").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Sirena de emergencia").assertIsDisplayed()
     }
